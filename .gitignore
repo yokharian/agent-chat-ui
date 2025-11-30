@@ -27,4 +27,6 @@ dist-ssr
 .langgraph_api
 .env
 .next/
+out
 next-env.d.ts
+
