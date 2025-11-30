@@ -7,8 +7,8 @@ import useInterruptedActions from "../hooks/use-interrupted-actions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useQueryState } from "nuqs";
-import { constructOpenInStudioURL, buildDecisionFromState } from "../utils";
-import { Decision, HITLRequest, DecisionType, ActionRequest } from "../types";
+import { buildDecisionFromState } from "../utils";
+import { ActionRequest, Decision, DecisionType, HITLRequest } from "../types";
 import { useStreamContext } from "@/providers/Stream";
 
 interface ThreadActionsViewProps {
@@ -88,7 +88,6 @@ export function ThreadActionsView({
 }: ThreadActionsViewProps) {
   const stream = useStreamContext();
   const [threadId] = useQueryState("threadId");
-  const [apiUrl] = useQueryState("apiUrl");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [addressedActions, setAddressedActions] = useState<
     Map<number, Decision>
@@ -151,21 +150,6 @@ export function ThreadActionsView({
     setCurrentIndex(0);
     setAddressedActions(new Map());
   }, [interrupt]);
-
-  const handleOpenInStudio = () => {
-    if (!apiUrl) {
-      toast.error("Error", {
-        description: "Please set the LangGraph deployment URL in settings.",
-        duration: 5000,
-        richColors: true,
-        closeButton: true,
-      });
-      return;
-    }
-
-    const studioUrl = constructOpenInStudioURL(apiUrl, threadId ?? undefined);
-    window.open(studioUrl, "_blank");
-  };
 
   const handleApproveAll = useCallback(() => {
     if (!hasMultipleActions) return;
@@ -320,16 +304,6 @@ export function ThreadActionsView({
           {threadId && <ThreadIdCopyable threadId={threadId} />}
         </div>
         <div className="flex flex-row items-center justify-start gap-2">
-          {apiUrl && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex items-center gap-1 bg-white"
-              onClick={handleOpenInStudio}
-            >
-              Studio
-            </Button>
-          )}
           <ButtonGroup
             handleShowState={() => handleShowSidePanel(true, false)}
             handleShowDescription={() => handleShowSidePanel(false, true)}
