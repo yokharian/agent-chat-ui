@@ -1,16 +1,7 @@
 import { validate } from "uuid";
 import { getApiKey } from "@/lib/api-key";
 import { Thread } from "@langchain/langgraph-sdk";
-import { useQueryState } from "nuqs";
-import {
-  createContext,
-  useContext,
-  ReactNode,
-  useCallback,
-  useState,
-  Dispatch,
-  SetStateAction,
-} from "react";
+import { createContext, Dispatch, ReactNode, SetStateAction, useCallback, useContext, useState } from "react";
 import { createClient } from "./client";
 
 interface ThreadContextType {
@@ -34,24 +25,34 @@ function getThreadSearchMetadata(
 }
 
 export function ThreadProvider({ children }: { children: ReactNode }) {
-  const [apiUrl] = useQueryState("apiUrl");
-  const [assistantId] = useQueryState("assistantId");
+  // Get environment variables
+  const envApiUrl: string | undefined = process.env.NEXT_PUBLIC_API_URL;
+  const envAssistantId: string | undefined =
+    process.env.NEXT_PUBLIC_ASSISTANT_ID;
+
+  // ERROR if we: don't have an API URL, or don't have an assistant ID
+  if (!envApiUrl || !envAssistantId) {
+    throw new Error(
+      `Missing required configuration. API URL: ${envApiUrl}, Assistant ID: ${envAssistantId}`,
+    );
+  }
+
   const [threads, setThreads] = useState<Thread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
 
   const getThreads = useCallback(async (): Promise<Thread[]> => {
-    if (!apiUrl || !assistantId) return [];
-    const client = createClient(apiUrl, getApiKey() ?? undefined);
+    if (!envApiUrl || !envAssistantId) return [];
+    const client = createClient(envApiUrl, getApiKey() ?? undefined);
 
     const threads = await client.threads.search({
       metadata: {
-        ...getThreadSearchMetadata(assistantId),
+        ...getThreadSearchMetadata(envAssistantId),
       },
       limit: 100,
     });
 
     return threads;
-  }, [apiUrl, assistantId]);
+  }, [envApiUrl, envAssistantId]);
 
   const value = {
     getThreads,

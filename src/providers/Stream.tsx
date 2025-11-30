@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { useStream } from "@langchain/langgraph-sdk/react";
 import { type Message } from "@langchain/langgraph-sdk";
 import {
@@ -12,7 +6,7 @@ import {
   isUIMessage,
   type RemoveUIMessage,
   type UIMessage,
-  uiMessageReducer,
+  uiMessageReducer
 } from "@langchain/langgraph-sdk/react-ui";
 import { useQueryState } from "nuqs";
 import { getApiKey } from "@/lib/api-key";
@@ -128,13 +122,12 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
   const envAssistantId: string | undefined =
     process.env.NEXT_PUBLIC_ASSISTANT_ID;
 
-  // Use URL params with env var fallbacks
-  const [apiUrl] = useQueryState("apiUrl", {
-    defaultValue: envApiUrl || "",
-  });
-  const [assistantId] = useQueryState("assistantId", {
-    defaultValue: envAssistantId || "",
-  });
+  // ERROR if we: don't have an API URL, or don't have an assistant ID
+  if (!envApiUrl || !envAssistantId) {
+    throw new Error(
+      `Missing required configuration. API URL: ${envApiUrl}, Assistant ID: ${envAssistantId}`,
+    );
+  }
 
   // For API key, use localStorage with env var fallback
   const [apiKey, _setApiKey] = useState(() => {
@@ -142,22 +135,11 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
     return storedKey || "";
   });
 
-  // Determine final values to use, prioritizing URL params then env vars
-  const finalApiUrl = apiUrl || envApiUrl;
-  const finalAssistantId = assistantId || envAssistantId;
-
-  // ERROR if we: don't have an API URL, or don't have an assistant ID
-  if (!finalApiUrl || !finalAssistantId) {
-    throw new Error(
-      `Missing required configuration. API URL: ${finalApiUrl}, Assistant ID: ${finalAssistantId}`,
-    );
-  }
-
   return (
     <StreamSession
       apiKey={apiKey}
-      apiUrl={finalApiUrl}
-      assistantId={finalAssistantId}
+      apiUrl={envApiUrl}
+      assistantId={envAssistantId}
     >
       {children}
     </StreamSession>
