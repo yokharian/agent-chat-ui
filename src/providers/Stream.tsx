@@ -1,4 +1,4 @@
-import React, { createContext, ReactNode, useContext, useEffect } from "react";
+import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { useStream } from "@langchain/langgraph-sdk/react";
 import { type Message } from "@langchain/langgraph-sdk";
 import {
@@ -6,16 +6,16 @@ import {
   isUIMessage,
   type RemoveUIMessage,
   type UIMessage,
-  uiMessageReducer,
+  uiMessageReducer
 } from "@langchain/langgraph-sdk/react-ui";
 import { useQueryState } from "nuqs";
+import { getApiKey } from "@/lib/api-key";
 import { useThreads } from "./Thread";
-import {
-  
-  langGraphProxyFetch,
-} from "@/lib/langgraphProxyFetch";
 import { toast } from "sonner";
-import { healthGate } from "@/lib/health";
+
+import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
+
 export type StateType = { messages: Message[]; ui?: UIMessage[] };
 
 const useTypedStream = useStream<
@@ -37,22 +37,44 @@ async function sleep(ms = 4000) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function checkGraphStatus(
+  apiUrl: string,
+  apiKey: string | null,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${apiUrl}/info`, {
+      ...(apiKey && {
+        headers: {
+          "X-Api-Key": apiKey,
+        },
+      }),
+    });
+
+    return res.ok;
+  } catch (e) {
+    console.error(e);
+    return false;
+  }
+}
 
 const StreamSession = ({
   children,
+  apiKey,
+  apiUrl,
   assistantId,
 }: {
   children: ReactNode;
+  apiKey: string | null;
+  apiUrl: string;
   assistantId: string;
 }) => {
   const [threadId, setThreadId] = useQueryState("threadId");
   const { getThreads, setThreads } = useThreads();
   const streamValue = useTypedStream({
-    assistantId: assistantId,
+    apiUrl,
+    apiKey: apiKey ?? undefined,
+    assistantId,
     threadId: threadId ?? null,
-    callerOptions: {
-      fetch: langGraphProxyFetch,
-    },
     fetchStateHistory: true,
     onCustomEvent: (event, options) => {
       if (isUIMessage(event) || isRemoveUIMessage(event)) {
@@ -71,22 +93,22 @@ const StreamSession = ({
   });
 
   useEffect(() => {
-    let mounted = true;
-    healthGate().then((ok) => { // ← Usar healthGate en lugar de checkAgentCoreGraphStatus
-      if (!mounted) return;
+    checkGraphStatus(apiUrl, apiKey).then((ok) => {
       if (!ok) {
         toast.error("Failed to connect to LangGraph server", {
-          description: () => <p>Failed to connect to LangGraph server.</p>,
+          description: () => (
+            <p>
+              Please ensure your graph is running at <code>{apiUrl}</code> and
+              your API key is correctly set (if connecting to a deployed graph).
+            </p>
+          ),
           duration: 10000,
           richColors: true,
           closeButton: true,
         });
       }
     });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  }, [apiKey, apiUrl]);
 
   return (
     <StreamContext.Provider value={streamValue}>
@@ -99,16 +121,70 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   // Get environment variables
+  const envApiUrl: string | undefined = process.env.NEXT_PUBLIC_API_URL;
   const envAssistantId: string | undefined =
     process.env.NEXT_PUBLIC_ASSISTANT_ID;
 
-  // ERROR if we: don't have an assistant ID
-  if (!envAssistantId) {
+  // Welcome dialog visibility
+  const [showWelcome, setShowWelcome] = useState(true);
+
+  // ERROR if we: don't have an API URL, or don't have an assistant ID
+  if (!envApiUrl || !envAssistantId) {
     throw new Error(
-      `Missing required configuration. Assistant ID: ${envAssistantId}`,
+      `Missing required configuration. API URL: ${envApiUrl}, Assistant ID: ${envAssistantId}`,
     );
   }
-  return <StreamSession assistantId={envAssistantId}>{children}</StreamSession>;
+
+  // For API key, use localStorage with env var fallback
+  const [apiKey, _setApiKey] = useState(() => {
+    const storedKey = getApiKey();
+    return storedKey || "";
+  });
+
+  // display welcome dialog
+  if (showWelcome) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center p-4">
+        <div className="animate-in fade-in-0 zoom-in-95 bg-background flex max-w-3xl flex-col rounded-lg border shadow-lg">
+          <div className="mt-14 flex flex-col gap-2 border-b p-6">
+            <div className="flex flex-col items-start gap-2">
+              <h1 className="text-xl font-semibold tracking-tight">
+                Agent Chat
+              </h1>
+            </div>
+            <p className="text-muted-foreground">Welcome to my Agent Chat!</p>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setShowWelcome(false);
+            }}
+            className="bg-muted/50 flex flex-col gap-6 p-6"
+          >
+            <div className="mt-2 flex justify-end">
+              <Button
+                type="submit"
+                size="lg"
+              >
+                Start
+                <ArrowRight className="size-5" />
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <StreamSession
+      apiKey={apiKey}
+      apiUrl={envApiUrl}
+      assistantId={envAssistantId}
+    >
+      {children}
+    </StreamSession>
+  );
 };
 
 // Create a custom hook to use the context

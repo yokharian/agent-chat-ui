@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { useThreads } from "@/providers/Thread";
 import { Thread } from "@langchain/langgraph-sdk";
+import { useEffect } from "react";
+
 import { getContentString } from "../utils";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import {
@@ -12,7 +14,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { PanelRightOpen, PanelRightClose } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { useEffect, useRef } from "react";
 
 function ThreadList({
   threads,
@@ -84,20 +85,14 @@ export default function ThreadHistory() {
   const { getThreads, threads, setThreads, threadsLoading, setThreadsLoading } =
     useThreads();
 
-  const hasFetched = useRef(false); // ← Agregar ref para evitar ejecuciones duplicadas
-
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (hasFetched.current) return; // ← Evitar ejecución duplicada
-    hasFetched.current = true;
-    
     setThreadsLoading(true);
     getThreads()
       .then(setThreads)
       .catch(console.error)
       .finally(() => setThreadsLoading(false));
-  }, [getThreads, setThreads, setThreadsLoading]); // ← Agregar dependencias correctas
-
+  }, []);
 
   return (
     <>

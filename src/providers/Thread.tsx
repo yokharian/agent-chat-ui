@@ -1,15 +1,8 @@
 import { validate } from "uuid";
-import {
-  createContext,
-  Dispatch,
-  ReactNode,
-  SetStateAction,
-  useCallback,
-  useContext,
-  useState,
-} from "react";
-import { langGraphSDKClient } from "@/providers/Client";
+import { getApiKey } from "@/lib/api-key";
 import { Thread } from "@langchain/langgraph-sdk";
+import { createContext, Dispatch, ReactNode, SetStateAction, useCallback, useContext, useState } from "react";
+import { createClient } from "./client";
 
 interface ThreadContextType {
   getThreads: () => Promise<Thread[]>;
@@ -33,15 +26,14 @@ function getThreadSearchMetadata(
 
 export function ThreadProvider({ children }: { children: ReactNode }) {
   // Get environment variables
-  const envRuntimeArn: string | undefined =
-    process.env.NEXT_PUBLIC_AGENTCORE_RUNTIME_ARN;
+  const envApiUrl: string | undefined = process.env.NEXT_PUBLIC_API_URL;
   const envAssistantId: string | undefined =
     process.env.NEXT_PUBLIC_ASSISTANT_ID;
 
-  // ERROR if we: don't have an Runtime Arn, or don't have an assistant ID
-  if (!envRuntimeArn || !envAssistantId) {
+  // ERROR if we: don't have an API URL, or don't have an assistant ID
+  if (!envApiUrl || !envAssistantId) {
     throw new Error(
-      `Missing required configuration. Runtime Arn: ${envRuntimeArn}, Assistant ID: ${envAssistantId}`,
+      `Missing required configuration. API URL: ${envApiUrl}, Assistant ID: ${envAssistantId}`,
     );
   }
 
@@ -49,16 +41,18 @@ export function ThreadProvider({ children }: { children: ReactNode }) {
   const [threadsLoading, setThreadsLoading] = useState(false);
 
   const getThreads = useCallback(async (): Promise<Thread[]> => {
-    if (!envRuntimeArn || !envAssistantId) return [];
-    const threads = await langGraphSDKClient.threads.search({
+    if (!envApiUrl || !envAssistantId) return [];
+    const client = createClient(envApiUrl, getApiKey() ?? undefined);
+
+    const threads = await client.threads.search({
       metadata: {
         ...getThreadSearchMetadata(envAssistantId),
       },
       limit: 100,
     });
-    console.log(threads);
+
     return threads;
-  }, [envRuntimeArn, envAssistantId]);
+  }, [envApiUrl, envAssistantId]);
 
   const value = {
     getThreads,
