@@ -45,6 +45,7 @@ Once the app is running (or if using the deployed site), you'll be prompted to e
 - **Deployment URL**: The URL of the LangGraph server you want to chat with. This can be a production or development URL.
 - **Assistant/Graph ID**: The name of the graph, or ID of the assistant to use when fetching, and submitting runs via the chat interface.
 - **LangSmith API Key**: (only required for connecting to deployed LangGraph servers) Your LangSmith API key to use when authenticating requests sent to LangGraph servers.
+- **Built with Agent Builder**: Toggle this on for Agent Builder deployments. This automatically sets the auth scheme to `langsmith-api-key`.
 
 After entering these values, click `Continue`. You'll then be redirected to a chat interface where you can start chatting with your LangGraph server.
 
@@ -55,7 +56,11 @@ You can bypass the initial setup form by setting the following environment varia
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:2024
 NEXT_PUBLIC_ASSISTANT_ID=agent
+NEXT_PUBLIC_AUTH_SCHEME=
 ```
+
+> [!NOTE]
+> If you are connecting to a LangSmith Agent Builder deployment, set `NEXT_PUBLIC_AUTH_SCHEME=langsmith-api-key`.
 
 > [!TIP]
 > If you want to connect to a production LangGraph server, read the [Going to Production](#going-to-production) section.
@@ -177,7 +182,7 @@ export function Writer(props: {
       </div>
 
       <Artifact title={props.title}>
-        <p className="p-4 whitespace-pre-wrap">{props.content}</p>
+        <p className="whitespace-pre-wrap p-4">{props.content}</p>
       </Artifact>
     </>
   );
@@ -194,9 +199,9 @@ To productionize the Agent Chat UI, you'll need to pick one of two ways to authe
 
 ### Quickstart - API Passthrough
 
-The quickest way to productionize the Agent Chat UI is to use the [API Passthrough](https://github.com/bracesproul/langgraph-nextjs-api-passthrough) package ([NPM link here](https://www.npmjs.com/package/langgraph-nextjs-api-passthrough)). This package provides a simple way to proxy requests to your LangGraph server, and handle authentication for you.
+The quickest way to productionize the Agent Chat UI is to use the [API Passthrough](https://github.com/bracesproul/langgraph-nextjs-api-passthrough) package ([NPM link here](https://www.npmjs.com/package/langgraph-nextjs-api-passthrough)). This package provides a simple way to proxy requests to your LangGraph server, attaching your LangSmith API key on the server so your users never need one. It does not authenticate the callers of that proxy for you — see [Authenticating the API Passthrough](#authenticating-the-api-passthrough) below, which you should set up before deploying.
 
-This repository already contains all of the code you need to start using this method. The only configuration you need to do is set the proper environment variables.
+This repository already contains the proxy route itself. The only configuration you need to do is set the proper environment variables.
 
 ```bash
 NEXT_PUBLIC_ASSISTANT_ID="agent"
@@ -216,6 +221,13 @@ Let's cover what each of these environment variables does:
 - `LANGSMITH_API_KEY`: Your LangSmith API key to use when authenticating requests sent to LangGraph servers. Once again, do _not_ prefix this with `NEXT_PUBLIC_` since it's a secret, and is only used on the server when the API proxy injects it into the request to your deployed LangGraph server.
 
 For in depth documentation, consult the [LangGraph Next.js API Passthrough](https://www.npmjs.com/package/langgraph-nextjs-api-passthrough) docs.
+
+### Authenticating the API Passthrough
+
+> [!WARNING]
+> The API passthrough does not authenticate your callers. If you deploy this repository with `LANGGRAPH_API_URL` and `LANGSMITH_API_KEY` set and no gate of your own, anyone who reaches your deployment URL can read, overwrite, and delete every thread and store item in your LangGraph deployment, and start runs billed to your LangSmith account.
+
+Before you deploy, set up [custom authentication](#advanced-setup---custom-authentication) on your LangGraph deployment and delete `src/app/api/[..._path]/route.ts`, so your LangSmith key never sits behind a public route.
 
 ### Advanced Setup - Custom Authentication
 
