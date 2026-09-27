@@ -1,16 +1,20 @@
-version: 1
-frontend:
+version: 2
+backend:
   phases:
-    preBuild:
-      commands:
-        - npm i
     build:
       commands:
-        - npm run build
+        - npx ampx generate outputs --branch "$BACKEND_APP_BRANCH" --app-id "$BACKEND_APP_ID"
+        - corepack enable
+        - pnpm install --frozen-lockfile
+frontend:
+  phases:
+    build:
+      commands:
+        - pnpm run build
   artifacts:
     baseDirectory: out
     files:
       - '**/*'
   cache:
     paths:
-      - node_modules/**/*
+      - ~/.pnpm-store/**/*
