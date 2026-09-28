@@ -3,9 +3,9 @@ backend:
   phases:
     build:
       commands:
-        - npx ampx generate outputs --branch "$BACKEND_APP_BRANCH" --app-id "$BACKEND_APP_ID"
         - corepack enable
         - pnpm install --frozen-lockfile
+        - npx ampx generate outputs --branch "$BACKEND_APP_BRANCH" --app-id "$BACKEND_APP_ID"
 frontend:
   phases:
     build:
