@@ -1,4 +1,10 @@
-import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { useStream } from "@langchain/langgraph-sdk/react";
 import { type Message } from "@langchain/langgraph-sdk";
 import {
@@ -6,13 +12,13 @@ import {
   isUIMessage,
   type RemoveUIMessage,
   type UIMessage,
-  uiMessageReducer
+  uiMessageReducer,
 } from "@langchain/langgraph-sdk/react-ui";
 import { useQueryState } from "nuqs";
-import { getApiKey } from "@/lib/api-key";
 import { useThreads } from "./Thread";
-import { toast } from "sonner";
+import { authFetch } from "@/lib/auth-fetch";
 
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
@@ -30,50 +36,44 @@ const useTypedStream = useStream<
   }
 >;
 
-type StreamContextType = ReturnType<typeof useTypedStream>;
+async function checkGraphStatus(apiUrl: string): Promise<boolean> {
+  try {
+    const response = await authFetch(`${apiUrl}/info`);
+
+    return response.ok;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+type StreamContextType = ReturnType<typeof useTypedStream> & {
+  apiUrl: string;
+};
 const StreamContext = createContext<StreamContextType | undefined>(undefined);
 
 async function sleep(ms = 4000) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function checkGraphStatus(
-  apiUrl: string,
-  apiKey: string | null,
-): Promise<boolean> {
-  try {
-    const res = await fetch(`${apiUrl}/info`, {
-      ...(apiKey && {
-        headers: {
-          "X-Api-Key": apiKey,
-        },
-      }),
-    });
-
-    return res.ok;
-  } catch (e) {
-    console.error(e);
-    return false;
-  }
-}
-
 const StreamSession = ({
   children,
-  apiKey,
   apiUrl,
   assistantId,
 }: {
   children: ReactNode;
-  apiKey: string | null;
   apiUrl: string;
   assistantId: string;
 }) => {
   const [threadId, setThreadId] = useQueryState("threadId");
   const { getThreads, setThreads } = useThreads();
+
   const streamValue = useTypedStream({
     apiUrl,
-    apiKey: apiKey ?? undefined,
     assistantId,
+    // Auth for every SDK request: the Client routes HTTP calls and the SSE
+    // run stream through asyncCaller.fetch, so this covers both channels.
+    callerOptions: { fetch: authFetch },
     threadId: threadId ?? null,
     fetchStateHistory: true,
     onCustomEvent: (event, options) => {
@@ -93,13 +93,12 @@ const StreamSession = ({
   });
 
   useEffect(() => {
-    checkGraphStatus(apiUrl, apiKey).then((ok) => {
+    checkGraphStatus(apiUrl).then((ok) => {
       if (!ok) {
         toast.error("Failed to connect to LangGraph server", {
           description: () => (
             <p>
-              Please ensure your graph is running at <code>{apiUrl}</code> and
-              your API key is correctly set (if connecting to a deployed graph).
+              Please ensure your graph is running at <code>{apiUrl}</code>.
             </p>
           ),
           duration: 10000,
@@ -108,10 +107,15 @@ const StreamSession = ({
         });
       }
     });
-  }, [apiKey, apiUrl]);
+  }, [apiUrl]);
 
   return (
-    <StreamContext.Provider value={streamValue}>
+    <StreamContext.Provider
+      value={{
+        ...streamValue,
+        apiUrl,
+      }}
+    >
       {children}
     </StreamContext.Provider>
   );
@@ -134,12 +138,6 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
       `Missing required configuration. API URL: ${envApiUrl}, Assistant ID: ${envAssistantId}`,
     );
   }
-
-  // For API key, use localStorage with env var fallback
-  const [apiKey, _setApiKey] = useState(() => {
-    const storedKey = getApiKey();
-    return storedKey || "";
-  });
 
   // display welcome dialog
   if (showWelcome) {
@@ -178,7 +176,6 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
 
   return (
     <StreamSession
-      apiKey={apiKey}
       apiUrl={envApiUrl}
       assistantId={envAssistantId}
     >

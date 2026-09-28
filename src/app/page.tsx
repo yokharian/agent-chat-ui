@@ -1,9 +1,8 @@
 "use client";
-// Export Amplify Gen 2 outputs directly for Amplify.configure.
+// Export Amplify Gen 2 outputs directly for Amplify.configure
 // This guarantees the correct shape (ResourcesConfig/AmplifyOutputs) for the SDK.
 // You may also override via NEXT_PUBLIC_* at runtime by calling Amplify.configure again if desired.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-import amplifyConfig from "../../amplify/amplify_outputs.json";
+import amplifyConfig from "../../amplify_outputs.json";
 import { Amplify } from "aws-amplify";
 import { Authenticator } from "@aws-amplify/ui-react";
 import { Thread } from "@/components/thread";
