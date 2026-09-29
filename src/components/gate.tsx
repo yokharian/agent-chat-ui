@@ -1,0 +1,77 @@
+"use client";
+
+import React, { useState } from "react";
+import { Ghost } from "lucide-react";
+
+import type { ReactNode } from "react";
+import { GuestBanner } from "@/components/guest-banner";
+import { LoginForm } from "@/components/login-form";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/providers/Auth";
+import { useTurnstileToken } from "@/components/turnstile-widget";
+
+export function Gate({ children }: { children: ReactNode }) {
+  const { session, loading, isGuest, signInAnonymously } = useAuth();
+  const [guestPending, setGuestPending] = useState(false);
+  const [guestError, setGuestError] = useState<string | null>(null);
+  const {
+    element: captchaElement,
+    reset: resetCaptcha,
+    token: captchaToken,
+  } = useTurnstileToken("auth");
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!session) {
+    const handleGuest = async () => {
+      setGuestPending(true);
+      setGuestError(null);
+      const { error } = await signInAnonymously(captchaToken ?? undefined);
+      if (error) {
+        setGuestError(error);
+      }
+      resetCaptcha();
+      setGuestPending(false);
+    };
+
+    return (
+      <div className="flex min-h-svh w-full flex-col items-center justify-center p-6 md:p-10">
+        <div className="w-full max-w-sm">
+          <LoginForm
+            captchaElement={captchaElement}
+            captchaToken={captchaToken}
+            onCaptchaConsumed={resetCaptcha}
+          />
+          <div className="mt-3 flex flex-col items-center gap-1">
+            <Button
+              className="w-full"
+              disabled={guestPending}
+              onClick={handleGuest}
+              type="button"
+              variant="outline"
+            >
+              <Ghost className="size-4" />
+              {guestPending ? "Entering as guest..." : "Continue as guest"}
+            </Button>
+            {guestError ? (
+              <p className="text-destructive text-sm">{guestError}</p>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-svh flex-col">
+      {isGuest ? <GuestBanner /> : null}
+      <div className="flex-1">{children}</div>
+    </div>
+  );
+}
