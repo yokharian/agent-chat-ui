@@ -7,10 +7,20 @@ import { Button } from "../ui/button";
 import { Checkpoint, Message } from "@langchain/langgraph-sdk";
 import { AssistantMessage, AssistantMessageLoading } from "./messages/ai";
 import { HumanMessage } from "./messages/human";
-import { DO_NOT_RENDER_ID_PREFIX, ensureToolCallsHaveResponses } from "@/lib/ensure-tool-responses";
+import {
+  DO_NOT_RENDER_ID_PREFIX,
+  ensureToolCallsHaveResponses,
+} from "@/lib/ensure-tool-responses";
 import { LangGraphLogoSVG } from "../icons/langgraph";
 import { TooltipIconButton } from "./tooltip-icon-button";
-import { ArrowDown, LoaderCircle, PanelRightClose, PanelRightOpen, SquarePen, XIcon } from "lucide-react";
+import {
+  ArrowDown,
+  LoaderCircle,
+  PanelRightClose,
+  PanelRightOpen,
+  SquarePen,
+  XIcon,
+} from "lucide-react";
 import { parseAsBoolean, useQueryState } from "nuqs";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import ThreadHistory from "./history";
@@ -19,8 +29,19 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { GitHubSVG } from "../icons/github";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import { ArtifactContent, ArtifactTitle, useArtifactContext, useArtifactOpen } from "./artifact";
+import { CurrentUserAvatar } from "@/components/current-user-avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
+import {
+  ArtifactContent,
+  ArtifactTitle,
+  useArtifactContext,
+  useArtifactOpen,
+} from "./artifact";
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -313,8 +334,9 @@ export function Thread() {
                   </Button>
                 )}
               </div>
-              <div className="absolute top-2 right-4 flex items-center">
+              <div className="absolute top-2 right-4 flex items-center gap-3">
                 <OpenGitHubRepo />
+                <CurrentUserAvatar />
               </div>
             </div>
           )}
@@ -360,8 +382,9 @@ export function Thread() {
               </div>
 
               <div className="flex items-center gap-4">
-                <div className="flex items-center">
+                <div className="flex items-center gap-3">
                   <OpenGitHubRepo />
+                  <CurrentUserAvatar />
                 </div>
                 <TooltipIconButton
                   size="lg"
