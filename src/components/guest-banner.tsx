@@ -40,7 +40,7 @@ function GuestBanner() {
   };
 
   return (
-    <div className="bg-muted/50 border-b">
+    <div className="bg-muted/50 shrink-0 border-b">
       <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-x-3 gap-y-2 px-4 py-2">
         <span className="text-muted-foreground text-sm">
           Guest session — chats live only on this device until you create an
