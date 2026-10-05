@@ -1,0 +1,82 @@
+# Builds the Next.js static export in GitHub Actions and publishes it to
+# Amplify Hosting through the manual deployment API (CreateDeployment /
+# StartDeployment). This replaces the former git-connected Amplify CI/CD
+# pipeline; Amplify now serves prebuilt artifacts only.
+
+name: Deploy
+
+on:
+  push:
+    branches: ["vehicle-sales-agent"]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy to Amplify Hosting
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+      NEXT_PUBLIC_ASSISTANT_ID: ${{ secrets.NEXT_PUBLIC_ASSISTANT_ID }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      AMPLIFY_APP_ID: ${{ vars.AMPLIFY_APP_ID }}
+      AMPLIFY_BRANCH: vehicle-sales-agent
+      AWS_REGION: ${{ vars.AWS_REGION }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.5.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install
+      - name: Build static export
+        run: pnpm build
+      - name: Zip build output
+        run: cd out && zip -rq "../out-${GITHUB_SHA::7}.zip" .
+      - name: Keep zip for rollback
+        uses: actions/upload-artifact@v7
+        with:
+          name: out-${{ github.sha }}
+          path: out-*.zip
+          retention-days: 30
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy to Amplify Hosting
+        run: |
+          set -euo pipefail
+          DEPLOY_JSON=$(aws amplify create-deployment --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" --output json)
+          JOB_ID=$(jq -r .jobId <<<"$DEPLOY_JSON")
+          ZIP_URL=$(jq -r .zipUrl <<<"$DEPLOY_JSON")
+          echo "Uploading build to Amplify (job $JOB_ID)"
+          curl -fsS -o /dev/null --upload-file "out-${GITHUB_SHA::7}.zip" "$ZIP_URL"
+          aws amplify start-deployment --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" --job-id "$JOB_ID"
+          for _ in $(seq 1 60); do
+            STATUS=$(aws amplify get-job --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" --job-id "$JOB_ID" --query 'job.summary.status' --output text || true)
+            echo "Deployment status: ${STATUS:-unknown}"
+            if [ "$STATUS" = "SUCCEED" ]; then
+              exit 0
+            fi
+            if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "Amplify deployment $STATUS"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "Timed out waiting for Amplify deployment"
+          exit 1
