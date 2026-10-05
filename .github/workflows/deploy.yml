@@ -62,7 +62,7 @@ jobs:
           set -euo pipefail
           DEPLOY_JSON=$(aws amplify create-deployment --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" --output json)
           JOB_ID=$(jq -r .jobId <<<"$DEPLOY_JSON")
-          ZIP_URL=$(jq -r .zipUrl <<<"$DEPLOY_JSON")
+          ZIP_URL=$(jq -r .zipUploadUrl <<<"$DEPLOY_JSON")
           echo "Uploading build to Amplify (job $JOB_ID)"
           curl -fsS -o /dev/null --upload-file "out-${GITHUB_SHA::7}.zip" "$ZIP_URL"
           aws amplify start-deployment --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" --job-id "$JOB_ID"
