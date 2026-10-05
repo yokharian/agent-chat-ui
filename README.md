@@ -56,11 +56,10 @@ You can bypass the initial setup form by setting the following environment varia
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:2024
 NEXT_PUBLIC_ASSISTANT_ID=agent
-NEXT_PUBLIC_AUTH_SCHEME=
 ```
 
 > [!NOTE]
-> If you are connecting to a LangSmith Agent Builder deployment, set `NEXT_PUBLIC_AUTH_SCHEME=langsmith-api-key`.
+> If you are connecting to a LangSmith Agent Builder deployment, use the toggle in the setup form, which sets the auth scheme to `langsmith-api-key` automatically.
 
 > [!TIP]
 > If you want to connect to a production LangGraph server, read the [Going to Production](#going-to-production) section.
@@ -206,26 +205,31 @@ This repository already contains the proxy route itself. The only configuration 
 ```bash
 NEXT_PUBLIC_ASSISTANT_ID="agent"
 # This should be the deployment URL of your LangGraph server
-LANGGRAPH_API_URL="https://my-agent.default.us.langgraph.app"
-# This should be the URL of your website + "/api". This is how you connect to the API proxy
+# (DEPRECATED) LANGGRAPH_API_URL="https://my-agent.default.us.langgraph.app"
+# This should be the URL of your website + "/api" (or the direct deployment URL).
+# This is how you connect to your LangGraph server
 NEXT_PUBLIC_API_URL="https://my-website.com/api"
-# Your LangSmith API key which is injected into requests inside the API proxy
-LANGSMITH_API_KEY="lsv2_..."
+# (DEPRECATED) Your LangSmith API key which is injected into requests inside the API proxy
+# LANGSMITH_API_KEY="lsv2_..."
 ```
 
 Let's cover what each of these environment variables does:
 
 - `NEXT_PUBLIC_ASSISTANT_ID`: The ID of the assistant you want to use when fetching, and submitting runs via the chat interface. This still needs the `NEXT_PUBLIC_` prefix, since it's not a secret, and we use it on the client when submitting requests.
-- `LANGGRAPH_API_URL`: The URL of your LangGraph server. This should be the production deployment URL.
-- `NEXT_PUBLIC_API_URL`: The URL of your website + `/api`. This is how you connect to the API proxy. For the [Agent Chat demo](https://agentchat.vercel.app), this would be set as `https://agentchat.vercel.app/api`. You should set this to whatever your production URL is.
-- `LANGSMITH_API_KEY`: Your LangSmith API key to use when authenticating requests sent to LangGraph servers. Once again, do _not_ prefix this with `NEXT_PUBLIC_` since it's a secret, and is only used on the server when the API proxy injects it into the request to your deployed LangGraph server.
+- `NEXT_PUBLIC_API_URL`: The URL of your website + `/api` (or the direct LangGraph deployment URL). This is how you connect to your LangGraph server. For the [Agent Chat demo](https://agentchat.vercel.app), this would be set as `https://agentchat.vercel.app/api`. You should set this to whatever your production URL is.
+
+> [!WARNING]
+> `LANGGRAPH_API_URL` is deprecated. Point `NEXT_PUBLIC_API_URL` at your LangGraph deployment (or your `/api` proxy) instead.
+
+> [!WARNING]
+> `LANGSMITH_API_KEY` is deprecated. Use custom authentication on your LangGraph deployment so requests authenticate with the caller's own credentials.
 
 For in depth documentation, consult the [LangGraph Next.js API Passthrough](https://www.npmjs.com/package/langgraph-nextjs-api-passthrough) docs.
 
 ### Authenticating the API Passthrough
 
 > [!WARNING]
-> The API passthrough does not authenticate your callers. If you deploy this repository with `LANGGRAPH_API_URL` and `LANGSMITH_API_KEY` set and no gate of your own, anyone who reaches your deployment URL can read, overwrite, and delete every thread and store item in your LangGraph deployment, and start runs billed to your LangSmith account.
+> The API passthrough does not authenticate your callers. If you deploy this repository pointing `NEXT_PUBLIC_API_URL` at an `/api` proxy with a LangSmith API key attached and no gate of your own, anyone who reaches your deployment URL can read, overwrite, and delete every thread and store item in your LangGraph deployment, and start runs billed to your LangSmith account.
 
 Before you deploy, set up [custom authentication](#advanced-setup---custom-authentication) on your LangGraph deployment and delete `src/app/api/[..._path]/route.ts`, so your LangSmith key never sits behind a public route.
 
