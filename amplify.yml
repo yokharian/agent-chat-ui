@@ -9,7 +9,7 @@ frontend:
   artifacts:
     baseDirectory: out
     files:
-      - '**/*'
+      - "**/*"
   cache:
     paths:
       - ~/.pnpm-store/**/*

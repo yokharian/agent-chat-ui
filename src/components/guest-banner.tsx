@@ -6,11 +6,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/providers/Auth";
 
 function GuestBanner() {
-  const { signOut } = useAuth();
+  const { signOut, session, updateUserAttributes } = useAuth();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -23,11 +22,9 @@ function GuestBanner() {
     setError(null);
     setMessage(null);
 
-    const { error: emailError } = await createClient().auth.updateUser({
-      email,
-    });
-    if (emailError) {
-      setError(emailError.message);
+    const { error } = await updateUserAttributes({ email });
+    if (error) {
+      setError(error);
       setPending(false);
       return;
     }

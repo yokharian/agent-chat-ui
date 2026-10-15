@@ -6,7 +6,7 @@ const nextConfig = {
     },
   },
   allowedDevOrigins: ["host.docker.internal"],
-  output: 'export'
+  output: "export",
 };
 
 export default nextConfig;

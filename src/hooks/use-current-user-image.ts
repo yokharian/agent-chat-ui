@@ -1,21 +1,20 @@
+"use client";
+
 import { useEffect, useState } from "react";
 
-import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/providers/Auth";
 
 export const useCurrentUserImage = () => {
   const [image, setImage] = useState<string | null>(null);
+  const { session } = useAuth();
 
   useEffect(() => {
-    const fetchUserImage = async () => {
-      const { data, error } = await createClient().auth.getSession();
-      if (error) {
-        console.error(error);
-      }
-
-      setImage(data.session?.user.user_metadata.avatar_url ?? null);
-    };
-    fetchUserImage();
-  }, []);
+    if (session?.user) {
+      setImage(session.user.attributes?.picture ?? null);
+    } else {
+      setImage(null);
+    }
+  }, [session]);
 
   return image;
 };

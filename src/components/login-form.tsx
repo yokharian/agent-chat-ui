@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 import { safeNextPath } from "@/lib/safe-next-path";
-import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/providers/Auth";
 import { useTurnstileToken } from "@/components/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,11 +32,12 @@ export function LoginForm({
   onCaptchaConsumed,
   ...props
 }: LoginFormProps) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { signIn } = useAuth();
   const hasSharedCaptcha =
     providedToken !== undefined || providedElement !== undefined;
   const internal = useTurnstileToken("signin", {
@@ -51,17 +52,21 @@ export function LoginForm({
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
     setIsLoading(true);
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
+      const { error, challengeName } = await signIn(
+        username,
         password,
-        options: { captchaToken: captchaToken ?? undefined },
-      });
-      if (error) throw error;
+        captchaToken ?? undefined,
+      );
+      if (error) throw new Error(error);
+      if (challengeName) {
+        // Handle MFA challenge if needed
+        router.push(`/auth/mfa?challenge=${challengeName}`);
+        return;
+      }
       const next = new URLSearchParams(window.location.search).get("next");
       router.push(safeNextPath(next, "/"));
     } catch (error: unknown) {
@@ -83,21 +88,21 @@ export function LoginForm({
             Sign in
           </CardTitle>
           <CardDescription>
-            Enter your email below to sign in to your account
+            Enter your username and password to sign in to your account
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="username">Username</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
+                  id="username"
+                  type="text"
+                  placeholder="username"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                 />
               </div>
               <div className="grid gap-2">

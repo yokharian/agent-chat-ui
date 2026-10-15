@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/providers/Auth";
 import { useTurnstileToken } from "@/components/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,12 +22,14 @@ export function SignUpForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { signUp } = useAuth();
   const {
     element: captchaElement,
     reset: resetCaptcha,
@@ -36,7 +38,6 @@ export function SignUpForm({
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
     setIsLoading(true);
     setError(null);
 
@@ -47,16 +48,20 @@ export function SignUpForm({
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
+      const { error, isSignUpComplete } = await signUp(
+        username,
         password,
-        options: {
-          captchaToken: captchaToken ?? undefined,
-          emailRedirectTo: `${window.location.origin}/auth/login`,
-        },
-      });
-      if (error) throw error;
-      router.push("/auth/sign-up-success");
+        email,
+        captchaToken ?? undefined,
+      );
+      if (error) throw new Error(error);
+      if (isSignUpComplete) {
+        router.push("/auth/login");
+      } else {
+        router.push(
+          `/auth/confirm-sign-up?username=${encodeURIComponent(username)}`,
+        );
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -80,6 +85,17 @@ export function SignUpForm({
         <CardContent>
           <form onSubmit={handleSignUp}>
             <div className="flex flex-col gap-6">
+              <div className="grid gap-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="username"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/providers/Auth";
 import { useTurnstileToken } from "@/components/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,10 +21,11 @@ export function ForgotPasswordForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { resetPassword } = useAuth();
   const {
     element: captchaElement,
     reset: resetCaptcha,
@@ -33,18 +34,20 @@ export function ForgotPasswordForm({
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
     setIsLoading(true);
     setError(null);
 
     try {
-      // The url which will be included in the email. This URL needs to be configured in your redirect URLs in the Supabase dashboard at https://supabase.com/dashboard/project/_/auth/url-configuration
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        captchaToken: captchaToken ?? undefined,
-        redirectTo: `${window.location.origin}/auth/update-password`,
-      });
-      if (error) throw error;
-      setSuccess(true);
+      const { error, isPasswordReset } = await resetPassword(
+        username,
+        captchaToken ?? undefined,
+      );
+      if (error) throw new Error(error);
+      if (isPasswordReset) {
+        setSuccess(true);
+      } else {
+        setSuccess(true);
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -68,8 +71,8 @@ export function ForgotPasswordForm({
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground text-sm">
-              If you registered using your email and password, you will receive
-              a password reset email.
+              If an account exists for that username, you will receive a
+              password reset email.
             </p>
           </CardContent>
         </Card>
@@ -80,7 +83,7 @@ export function ForgotPasswordForm({
               Reset Your Password
             </CardTitle>
             <CardDescription>
-              Type in your email and we&apos;ll send you a link to reset your
+              Type in your username and we&apos;ll send you a link to reset your
               password
             </CardDescription>
           </CardHeader>
@@ -88,14 +91,14 @@ export function ForgotPasswordForm({
             <form onSubmit={handleForgotPassword}>
               <div className="flex flex-col gap-6">
                 <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="username">Username</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
+                    id="username"
+                    type="text"
+                    placeholder="username"
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                   />
                 </div>
                 {error && <p className="text-sm text-red-500">{error}</p>}

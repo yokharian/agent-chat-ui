@@ -1,10 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, Suspense } from "react";
 
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/providers/Auth";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function UpdatePasswordForm({
+function UpdatePasswordFormContent({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
@@ -24,17 +24,26 @@ export function UpdatePasswordForm({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const username = searchParams.get("username") ?? "";
+  const code = searchParams.get("code") ?? "";
+  const { confirmResetPassword } = useAuth();
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
     setIsLoading(true);
     setError(null);
 
+    if (!username || !code) {
+      setError("Invalid reset link");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
-      router.push("/");
+      const { error } = await confirmResetPassword(username, code, password);
+      if (error) throw new Error(error);
+      router.push("/auth/login");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -57,7 +66,17 @@ export function UpdatePasswordForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleForgotPassword}>
+          <form onSubmit={handleUpdatePassword}>
+            <input
+              type="hidden"
+              name="username"
+              value={username}
+            />
+            <input
+              type="hidden"
+              name="code"
+              value={code}
+            />
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
                 <Label htmlFor="password">New password</Label>
@@ -83,5 +102,19 @@ export function UpdatePasswordForm({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export function UpdatePasswordForm({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<"div">) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <UpdatePasswordFormContent
+        className={className}
+        {...props}
+      />
+    </Suspense>
   );
 }

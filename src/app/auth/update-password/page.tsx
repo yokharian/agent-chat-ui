@@ -1,3 +1,7 @@
+"use client";
+
+export const dynamic = "force-dynamic";
+
 import { UpdatePasswordForm } from "@/components/update-password-form";
 
 export default function Page() {
