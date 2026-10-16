@@ -22,14 +22,14 @@ src/app/auth/
 
 ## WHERE TO LOOK
 
-| Flow               | Page                                                                 |
-| ------------------ | -------------------------------------------------------------------- |
-| Login              | `login/page.tsx` → `LoginForm`                                       |
-| Signup             | `sign-up/page.tsx` → `SignUpForm`                                    |
-| Email verification | `confirm-sign-up/page.tsx` (code entry + resend)                     |
-| Forgot password    | `forgot-password/page.tsx` → `ForgotPasswordForm`                    |
-| Reset password     | `update-password/page.tsx` → `UpdatePasswordForm`                  |
-| Errors             | `error/page.tsx`                                                     |
+| Flow               | Page                                              |
+| ------------------ | ------------------------------------------------- |
+| Login              | `login/page.tsx` → `LoginForm`                    |
+| Signup             | `sign-up/page.tsx` → `SignUpForm`                 |
+| Email verification | `confirm-sign-up/page.tsx` (code entry + resend)  |
+| Forgot password    | `forgot-password/page.tsx` → `ForgotPasswordForm` |
+| Reset password     | `update-password/page.tsx` → `UpdatePasswordForm` |
+| Errors             | `error/page.tsx`                                  |
 
 ## CONVENTIONS
 

@@ -40,7 +40,7 @@ src/components/
 | Auth screens      | root files: `login-form`, `sign-up-form`, `forgot-password-form`, `update-password-form`, `gate`, `guest-banner`, `logout-button` |
 | Chat UI           | `thread/index.tsx` (main), `thread/messages/`, `thread/artifact.tsx`                                                              |
 | Interrupts / HITL | `thread/agent-inbox/` (components, hooks, types, utils)                                                                           |
-| UI primitives     | `ui/` — button, card, input, sheet, etc. (see ui/AGENTS.md)                                                                                  |
+| UI primitives     | `ui/` — button, card, input, sheet, etc. (see ui/AGENTS.md)                                                                       |
 
 ## CONVENTIONS
 

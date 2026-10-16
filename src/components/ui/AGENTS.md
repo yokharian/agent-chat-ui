@@ -33,7 +33,7 @@ src/components/ui/
 | Buttons     | `button.tsx`                                                   |
 | Cards       | `card.tsx`                                                     |
 | Form inputs | `input.tsx`, `password-input.tsx`, `textarea.tsx`, `label.tsx` |
-| Overlays    | `sheet.tsx`, `tooltip.tsx`                       |
+| Overlays    | `sheet.tsx`, `tooltip.tsx`                                     |
 | Feedback    | `sonner.tsx` (Toaster), `skeleton.tsx`                         |
 | Toggles     | `switch.tsx`                                                   |
 

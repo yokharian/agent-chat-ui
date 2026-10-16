@@ -20,9 +20,9 @@ src/providers/
 
 | Provider     | Purpose                                                                                               |
 | ------------ | ----------------------------------------------------------------------------------------------------- |
-| `Auth.tsx`   | `AuthProvider` mounts in `app/auth/layout.tsx` + `app/page.tsx`; `useAuth` used 10×                    |
+| `Auth.tsx`   | `AuthProvider` mounts in `app/auth/layout.tsx` + `app/page.tsx`; `useAuth` used 10×                   |
 | `Stream.tsx` | `StreamProvider` mounts in `app/page.tsx`; `useStreamContext` used 6× (thread, messages, agent-inbox) |
-| `Thread.tsx` | `ThreadProvider` mounts in `app/page.tsx`; `useThreads` used 2× (history, Stream)             |
+| `Thread.tsx` | `ThreadProvider` mounts in `app/page.tsx`; `useThreads` used 2× (history, Stream)                     |
 | `client.ts`  | `createClient` — LangGraph SDK factory used by Stream + Thread providers                              |
 
 ## CONVENTIONS

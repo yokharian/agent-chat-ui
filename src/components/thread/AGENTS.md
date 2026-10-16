@@ -31,14 +31,14 @@ src/components/thread/
 
 ## WHERE TO LOOK
 
-| Task                      | Location                                        |
-| ------------------------- | ----------------------------------------------- |
-| Main chat render + input  | `index.tsx`                                     |
+| Task                      | Location                                                      |
+| ------------------------- | ------------------------------------------------------------- |
+| Main chat render + input  | `index.tsx`                                                   |
 | Streaming message render  | `messages/ai.tsx` (AssistantMessage, AssistantMessageLoading) |
-| Tool calls / results      | `messages/tool-calls.tsx`                       |
-| Artifacts (files, images) | `artifact.tsx`                                  |
-| History sidebar           | `history/index.tsx`                             |
-| Human-in-the-loop         | `agent-inbox/`                                  |
+| Tool calls / results      | `messages/tool-calls.tsx`                                     |
+| Artifacts (files, images) | `artifact.tsx`                                                |
+| History sidebar           | `history/index.tsx`                                           |
+| Human-in-the-loop         | `agent-inbox/`                                                |
 
 ## CONVENTIONS
 

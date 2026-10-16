@@ -21,11 +21,11 @@ src/components/thread/agent-inbox/components/
 
 | Component                 | Purpose                                                           |
 | ------------------------- | ----------------------------------------------------------------- |
-| `inbox-item-input.tsx`    | (499 lines) main decision editing UI — approve/edit/reject  |
+| `inbox-item-input.tsx`    | (499 lines) main decision editing UI — approve/edit/reject        |
 | `state-view.tsx`          | `StateView` / `StateViewObject` — recursive object/array renderer |
-| `thread-actions-view.tsx` | `ThreadActionsView` — action list; owns `useInterruptedActions`              |
+| `thread-actions-view.tsx` | `ThreadActionsView` — action list; owns `useInterruptedActions`   |
 | `thread-id.tsx`           | `ThreadIdTooltip` (hover) + `ThreadIdCopyable` (click to copy)    |
-| `tool-call-table.tsx`     | `ToolCallTable` — renders a single `ToolCall`             |
+| `tool-call-table.tsx`     | `ToolCallTable` — renders a single `ToolCall`                     |
 
 ## CONVENTIONS
 
