@@ -22,17 +22,26 @@ jobs:
   deploy:
     name: Build and deploy to Amplify Hosting
     runs-on: ubuntu-latest
+    environment:
+      name: Production
+      url: https://vsa.demo.yokharian.dev/
     env:
       NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
       NEXT_PUBLIC_ASSISTANT_ID: ${{ secrets.NEXT_PUBLIC_ASSISTANT_ID }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      AMPLIFY_OUTPUTS_JSON: ${{ secrets.AMPLIFY_OUTPUTS_JSON }}
       AMPLIFY_APP_ID: ${{ vars.AMPLIFY_APP_ID }}
       AMPLIFY_BRANCH: vehicle-sales-agent
       AWS_REGION: ${{ vars.AWS_REGION }}
     steps:
       - uses: actions/checkout@v7
+      - name: Write amplify_outputs.json (gitignored backend config, required by the build)
+        run: |
+          if [ -z "$AMPLIFY_OUTPUTS_JSON" ]; then
+            echo "::error::AMPLIFY_OUTPUTS_JSON secret is empty — set it to the backend's amplify_outputs.json content"
+            exit 1
+          fi
+          printf '%s' "$AMPLIFY_OUTPUTS_JSON" > amplify_outputs.json
       - uses: pnpm/action-setup@v6
         with:
           version: 10.5.1
