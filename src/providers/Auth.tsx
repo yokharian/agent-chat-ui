@@ -7,7 +7,6 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import { Amplify } from "aws-amplify";
 import {
   fetchAuthSession,
   signIn,
@@ -21,7 +20,11 @@ import {
   updateUserAttributes,
 } from "aws-amplify/auth";
 import { Hub } from "aws-amplify/utils";
-import outputs from "../../amplify_outputs.json";
+import {
+  configureGuestAuth,
+  configureRegisteredAuth,
+  guestAuthConfigAvailable,
+} from "@/lib/auth-config";
 
 interface CognitoUser {
   username: string;
@@ -75,6 +78,21 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/**
+ * Random password for guest users. The guest user pool requires at least 8
+ * characters with one lowercase letter and one digit.
+ */
+function generateGuestPassword(): string {
+  const digits = "23456789";
+  const letters = "abcdefghijkmnpqrstuvwxyz";
+  const random = (charset: string, length: number): string => {
+    const bytes = new Uint32Array(length);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => charset[b % charset.length]).join("");
+  };
+  return `g${random(digits, 1)}${random(letters, 5)}${random(digits + letters, 10)}`;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    Amplify.configure(outputs);
+    configureRegisteredAuth();
 
     const loadSession = async () => {
       try {
@@ -107,9 +125,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsGuest(false);
         }
       } catch {
+        // No registered-pool session — restore a guest-pool session if present.
+        let guestSession: AuthSession | null = null;
+        if (guestAuthConfigAvailable() && configureGuestAuth()) {
+          try {
+            const authSession = await fetchAuthSession();
+            const accessToken = authSession.tokens?.accessToken?.toString();
+            if (accessToken) {
+              const currentUser = await getCurrentUser();
+              guestSession = {
+                user: {
+                  username: currentUser.username,
+                  email: currentUser.signInDetails?.loginId,
+                  attributes: {
+                    ...((currentUser as { attributes?: Record<string, string> })
+                      .attributes ?? {}),
+                    "custom:is_guest": "true",
+                  },
+                },
+                accessToken,
+                idToken: authSession.tokens?.idToken?.toString(),
+              };
+            }
+          } catch {
+            // No guest session either — fall through to signed-out.
+          } finally {
+            configureRegisteredAuth();
+          }
+        }
         if (mounted) {
-          setSession(null);
-          setIsGuest(false);
+          if (guestSession) {
+            setSession(guestSession);
+            setIsGuest(true);
+          } else {
+            setSession(null);
+            setIsGuest(false);
+          }
         }
       } finally {
         if (mounted) setLoading(false);
@@ -146,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       captchaToken?: string,
     ): Promise<{ error: string | null; challengeName?: string }> => {
       try {
+        configureRegisteredAuth();
         const result = await signIn({ username, password });
         if (result.isSignedIn) {
           return { error: null };
@@ -175,6 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       captchaToken?: string,
     ): Promise<{ error: string | null; isSignUpComplete?: boolean }> => {
       try {
+        configureRegisteredAuth();
         const result = await signUp({
           username,
           password,
@@ -198,6 +251,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       code: string,
     ): Promise<{ error: string | null }> => {
       try {
+        configureRegisteredAuth();
         await confirmSignUp({ username, confirmationCode: code });
         return { error: null };
       } catch (error: unknown) {
@@ -212,6 +266,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const resendSignUpCodeFn = useCallback(
     async (username: string): Promise<{ error: string | null }> => {
       try {
+        configureRegisteredAuth();
         await resendSignUpCode({ username });
         return { error: null };
       } catch (error: unknown) {
@@ -229,6 +284,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       captchaToken?: string,
     ): Promise<{ error: string | null; isPasswordReset?: boolean }> => {
       try {
+        configureRegisteredAuth();
         const result = await resetPassword({ username });
         return { error: null, isPasswordReset: result.isPasswordReset };
       } catch (error: unknown) {
@@ -248,6 +304,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       newPassword: string,
     ): Promise<{ error: string | null }> => {
       try {
+        configureRegisteredAuth();
         await confirmResetPassword({
           username,
           confirmationCode: code,
@@ -267,14 +324,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInAnonymouslyFn = useCallback(
     async (captchaToken?: string): Promise<{ error: string | null }> => {
       try {
-        const guestSession: AuthSession = {
+        if (!guestAuthConfigAvailable() || !configureGuestAuth()) {
+          return {
+            error: "Guest sign-in is unavailable. Please try again later.",
+          };
+        }
+
+        const guestName = `guest_${Date.now()}`;
+        // The guest pool signs in with email usernames; a synthetic address
+        // under the app's domain keeps the required format without a mailbox.
+        const username = `${guestName}@guest.yokharian.dev`;
+        const password = generateGuestPassword();
+        const clientMetadata = captchaToken ? { captchaToken } : undefined;
+
+        // 1. Register the guest in the guest user pool — the hard requirement.
+        try {
+          await signUp({
+            username,
+            password,
+            options: {
+              userAttributes: {
+                email: username,
+                "custom:guest": "true",
+              },
+              clientMetadata,
+            },
+          });
+        } catch (error: unknown) {
+          return {
+            error:
+              error instanceof Error ? error.message : "Guest sign in failed",
+          };
+        }
+
+        // 2. Sign the guest in so requests carry a real guest-pool token. The
+        // pool's pre-sign-up trigger auto-confirms signups once the backend
+        // change is deployed; until then fall back to a local guest session.
+        let guestSession: AuthSession = {
           user: {
-            username: `guest_${Date.now()}`,
+            username: guestName,
             email: undefined,
             attributes: { "custom:is_guest": "true" },
           },
           accessToken: undefined,
         };
+        try {
+          await signIn({ username, password, options: { clientMetadata } });
+          const authSession = await fetchAuthSession();
+          const currentUser = await getCurrentUser();
+          guestSession = {
+            user: {
+              username: currentUser.username,
+              email: currentUser.signInDetails?.loginId,
+              attributes: { "custom:is_guest": "true" },
+            },
+            accessToken: authSession.tokens?.accessToken?.toString(),
+            idToken: authSession.tokens?.idToken?.toString(),
+          };
+        } catch (signInError) {
+          console.warn("Guest registered but not signed in:", signInError);
+        }
+
         setSession(guestSession);
         setIsGuest(true);
         return { error: null };
@@ -290,21 +400,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOutFn = useCallback(async () => {
     try {
+      // Sign out from the pool the active session belongs to.
+      if (isGuest) {
+        configureGuestAuth();
+      } else {
+        configureRegisteredAuth();
+      }
       await signOut({ global: true });
-      setSession(null);
-      setIsGuest(false);
     } catch (error) {
       console.error("Sign out error:", error);
+    } finally {
       setSession(null);
       setIsGuest(false);
+      configureRegisteredAuth();
     }
-  }, []);
+  }, [isGuest]);
 
   const updateUserAttributesFn = useCallback(
     async (
       attributes: Record<string, string>,
     ): Promise<{ error: string | null }> => {
       try {
+        // Update attributes on the pool the active session belongs to
+        // (guests convert their account from the guest banner).
+        if (isGuest) {
+          configureGuestAuth();
+        } else {
+          configureRegisteredAuth();
+        }
         await updateUserAttributes({ userAttributes: attributes });
         return { error: null };
       } catch (error: unknown) {
@@ -313,7 +436,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
     },
-    [],
+    [isGuest],
   );
 
   return (

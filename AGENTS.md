@@ -78,8 +78,8 @@ agent-chat-ui/
 ## UNIQUE STYLES
 
 - `DO_NOT_RENDER_ID_PREFIX = "do-not-render-"` for hidden messages (paired with `langsmith:do-not-render` tag)
-- Guest session via Cognito Identity Pool unauthenticated identities; convert via `updateUserAttributes({ email })`
-- `authFetch` single chokepoint for both HTTP and SSE (LangGraph SDK `callerOptions.fetch`)
+- Guest flow: "Continue as guest" registers + signs the user into the **guest user pool** (IDs in `amplify_outputs.json` custom payload; pool config in `src/lib/auth-config.ts`); auto-confirmed by the backend's guest pre-sign-up trigger; convert via `updateUserAttributes({ email })` (guest banner)
+- `authFetch` single chokepoint for both HTTP and SSE (LangGraph SDK `callerOptions.fetch`); token resolves registered pool first, then guest pool
 - `WelcomeDialog` → `Gate` (dynamic `ssr:false`) → providers composition on `app/page.tsx`
 - `prevMessageLength` ref workaround in `thread/index.tsx` (TODO: move into `useStream`)
 
