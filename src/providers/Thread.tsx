@@ -32,7 +32,7 @@ function getThreadSearchMetadata(
 }
 
 export function ThreadProvider({ children }: { children: ReactNode }) {
-  const envApiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const envApiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
   const envAssistantId = process.env.NEXT_PUBLIC_ASSISTANT_ID;
 
   if (!envApiUrl || !envAssistantId) {
