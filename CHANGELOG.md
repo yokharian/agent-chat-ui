@@ -31,8 +31,9 @@ First tagged release of the vehicle-sales-agent fork of [langchain-ai/agent-chat
 
 **Upstream baseline**
 
-- Forked from upstream `cf72cb0`; upstream's dependabot group bump (#325) is merged into branch history. At release time upstream is 3 commits ahead (major version bumps, intentionally deferred for manual review).
+- Forked from upstream `cf72cb0`; upstream's dependabot group bump (#325) is merged into branch history. At release time upstream is 3 commits ahead (its own dependabot bumps: two minor groups already superseded by the fork's #4, and the framer-motion 14 major now covered by PR #5).
 - The fork's own Dependabot auto-merge pipeline ran live before tagging: grouped bump #4 (28 updates) merged itself into `vehicle-sales-agent`.
+- The major group (PR #5) was merged manually into the release per maintainer decision: framer-motion 14.3 and TypeScript ~7.0.2 (the fork had pinned TypeScript 5.9.3 since `a650cf2`). Majors stay manual because CI has no build gate; this merge was that manual review.
 - A Supabase authentication phase was rolled back to Amplify/Cognito in `43d91a6`.
 
 **Known limitations**
