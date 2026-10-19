@@ -1,0 +1,36 @@
+# Auto-merges Dependabot's grouped minor-and-patch pull requests once CI
+# passes, so routine dependency bumps land on vehicle-sales-agent without a
+# manual step. Major-version bumps ("Bump the major group ...") are left for
+# human review: CI here has no build/typecheck job, so an auto-landed major
+# could break the build that deploy.yml runs on push.
+#
+# Two one-time repo settings are required for this to work:
+#   1. Settings -> General -> Pull Requests: enable "Allow auto-merge".
+#   2. Dependabot is off by default on forks: enable version updates for this
+#      fork (Settings -> Advanced Security -> Dependabot version updates).
+
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Enable auto-merge for minor-and-patch bumps
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      contains(github.event.pull_request.title, 'minor-and-patch group')
+    steps:
+      - name: Enable auto-merge (squash when checks pass)
+        run: |
+          gh pr merge --auto --squash "$PR_URL" || \
+            echo "::warning::auto-merge not enabled (Allow auto-merge setting off, or PR already in auto-merge)"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
