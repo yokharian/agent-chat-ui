@@ -37,5 +37,5 @@ src/app/auth/
 - All pages are `"use client"`; only `confirm-sign-up` and `update-password` also export `dynamic = "force-dynamic"`
 - Forms call `useAuth` actions and render returned `{ error }` — never throw
 - Turnstile captcha (`useTurnstileToken`) on login / sign-up / forgot-password forms + the Gate guest button — not update-password
-- `error/page.tsx` is the only page wrapping content in `React.Suspense`
-- `confirm-sign-up` reads `username` + `code` from form (not searchParams)
+- `error/page.tsx` and `confirm-sign-up/page.tsx` wrap content in `React.Suspense` (required for `useSearchParams` under static export)
+- `confirm-sign-up` prefills the email from the `?username` search param; the code comes from the form

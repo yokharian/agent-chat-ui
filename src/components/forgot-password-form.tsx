@@ -71,7 +71,7 @@ export function ForgotPasswordForm({
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground text-sm">
-              If an account exists for that username, you will receive a
+              If an account exists for that email, you will receive a
               password reset email.
             </p>
           </CardContent>
@@ -83,7 +83,7 @@ export function ForgotPasswordForm({
               Reset Your Password
             </CardTitle>
             <CardDescription>
-              Type in your username and we&apos;ll send you a link to reset your
+              Type in your email and we&apos;ll send you a link to reset your
               password
             </CardDescription>
           </CardHeader>
@@ -91,11 +91,11 @@ export function ForgotPasswordForm({
             <form onSubmit={handleForgotPassword}>
               <div className="flex flex-col gap-6">
                 <div className="grid gap-2">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="username">Email</Label>
                   <Input
                     id="username"
-                    type="text"
-                    placeholder="username"
+                    type="email"
+                    placeholder="m@example.com"
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
