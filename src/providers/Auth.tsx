@@ -233,6 +233,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
           options: {
             userAttributes: { email },
+            validationData: captchaToken
+              ? { turnstileToken: captchaToken }
+              : undefined,
           },
         });
         return { error: null, isSignUpComplete: result.isSignUpComplete };
@@ -336,8 +339,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const username = `${guestName}@guest.yokharian.dev`;
         const password = generateGuestPassword();
         const clientMetadata = captchaToken ? { captchaToken } : undefined;
+        const validationData = captchaToken
+          ? { turnstileToken: captchaToken }
+          : undefined;
 
         // 1. Register the guest in the guest user pool — the hard requirement.
+        // The backend pre-sign-up trigger reads the Turnstile token from
+        // validationData["turnstileToken"], never from clientMetadata.
         try {
           await signUp({
             username,
@@ -347,7 +355,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 email: username,
                 "custom:guest": "true",
               },
-              clientMetadata,
+              validationData,
             },
           });
         } catch (error: unknown) {
