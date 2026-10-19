@@ -1,13 +1,13 @@
 {
   "name": "agent-chat-ui",
-  "readme": "https://github.com/langchain-ai/agent-chat-ui/blob/main/README.md",
-  "homepage": "https://agentchat.vercel.app",
+  "readme": "https://github.com/yokharian/agent-chat-ui/blob/vehicle-sales-agent/README.md",
+  "homepage": "https://vsa.demo.yokharian.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/langchain-ai/agent-chat-ui.git"
+    "url": "git+https://github.com/yokharian/agent-chat-ui.git"
   },
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "next dev",
@@ -40,7 +40,6 @@
     "esbuild-plugin-tailwindcss": "^2.2.0",
     "framer-motion": "^13.5.0",
     "katex": "^0.19.0",
-    "langgraph-nextjs-api-passthrough": "^0.1.4",
     "lodash": "^4.18.1",
     "lucide-react": "^1.57.0",
     "next-themes": "^0.4.6",

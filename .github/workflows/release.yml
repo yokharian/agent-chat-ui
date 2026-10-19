@@ -1,0 +1,37 @@
+# Publishes a GitHub Release whenever a "v*" tag is pushed. The release body
+# is the matching version section from CHANGELOG.md.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Extract the changelog section for this tag
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          awk -v ver="$ver" '
+            /^## \[/ { inside = ($0 ~ "^## \\[" ver "\\]"); if (inside) next }
+            inside { print }
+          ' CHANGELOG.md > /tmp/release-body.md
+          if [ ! -s /tmp/release-body.md ]; then
+            echo "::error::No CHANGELOG.md section found for ${GITHUB_REF_NAME} (expected a '## [${ver}]' heading)"
+            exit 1
+          fi
+          echo "Extracted release notes for ${GITHUB_REF_NAME}:"
+          head -n 5 /tmp/release-body.md
+      - name: Create the release
+        run: >-
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME"
+          --notes-file /tmp/release-body.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
