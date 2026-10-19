@@ -83,7 +83,7 @@ Refs = files importing the symbol (regex-measured 2026-10-16).
 - **NO** external state stores (Redux/Zustand) — pure React Context
 - **NO** `any` — ESLint `no-explicit-any` disabled but avoid anyway
 - **NO** barrel exports — direct imports only
-- **DO NOT** follow the README "Production deployment" API-passthrough section — this fork is SSG + Amplify; `langgraph-nextjs-api-passthrough` is an unused dep
+- **DO NOT** reintroduce an API-passthrough proxy — this fork is SSG + Amplify; the unused `langgraph-nextjs-api-passthrough` dependency was removed in v1.0.0
 
 ## UNIQUE STYLES
 
