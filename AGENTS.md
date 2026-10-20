@@ -89,8 +89,8 @@ Refs = files importing the symbol (regex-measured 2026-10-16).
 
 - `DO_NOT_RENDER_ID_PREFIX = "do-not-render-"` (`lib/ensure-tool-responses.ts`); ids with the prefix never render — README pairs it with the `langsmith:do-not-render` model tag
 - `ensureToolCallsHaveResponses` fabricates `do-not-render-` tool messages so unanswered AI tool_calls don't break state
-- `authFetch` single chokepoint for both HTTP and SSE (LangGraph SDK `callerOptions.fetch`); token resolves registered pool first, then guest pool
-- Guest flow: "Continue as guest" registers + signs the user into the **guest user pool** (IDs in `amplify_outputs.json` custom payload; pool config in `src/lib/auth-config.ts`); auto-confirmed by the backend's guest pre-sign-up trigger; convert via `updateUserAttributes({ email })` (guest banner)
+- `authFetch` single chokepoint for both HTTP and SSE (LangGraph SDK `callerOptions.fetch`); token resolves the registered session first, then the guest token store
+- Guest flow: one user pool for both flows. "Continue as guest" calls the AppSync `createGuest` query (Turnstile token in, tokens out — the lambda burns the password, so there is no later sign-in) and keeps `accessToken`/`idToken`/`refreshToken` in memory + sessionStorage (`src/lib/guest-session.ts`); renewal uses the refresh token, and a dead guest is replaced transparently. Guests cannot convert — the banner links to a fresh signup
 - Provider composition on `app/page.tsx`: `AuthProvider > Suspense > (WelcomeDialog | Gate > ThreadProvider > StreamProvider > ArtifactProvider > Thread)`
 - Interrupts route in `messages/ai.tsx`: `isAgentInboxInterruptSchema` → agent-inbox `ThreadView`, else `GenericInterruptView`
 - `prevMessageLength` ref workaround in `thread/index.tsx` (TODO at L194: move into `useStream`)

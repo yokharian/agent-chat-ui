@@ -22,9 +22,9 @@ A fork of [langchain-ai/agent-chat-ui](https://github.com/langchain-ai/agent-cha
 ### Authentication
 
 - Sign-in, sign-up with confirmation, and forgot/reset password flows live in [`src/app/auth/`](src/app/auth/); forms in `src/components/`, session logic in [`src/providers/Auth.tsx`](src/providers/Auth.tsx).
-- **Guest flow:** "Continue as guest" registers and signs the visitor into a separate guest user pool (pool IDs ship in the custom payload of `amplify_outputs.json`; see [`src/lib/auth-config.ts`](src/lib/auth-config.ts)). Guests convert to registered users by adding an email.
+- **Guest flow:** one user pool serves both flows. "Continue as guest" calls the backend's `createGuest` AppSync query with a Turnstile token; the lambda admin-creates the user, burns its password and returns only tokens (`accessToken`, `idToken`, `refreshToken`). Those tokens live in memory/sessionStorage, are renewed with the refresh token before expiry, and a fresh guest is minted transparently when renewal fails. Guests cannot convert their account — "Create account" starts a new registered signup.
 - **Turnstile:** the auth forms embed a Cloudflare Turnstile challenge (site key via `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, verified by the Amplify backend).
-- Every LangGraph SDK request (HTTP and SSE) goes through [`authFetch`](src/lib/auth-fetch.ts), which attaches the current Cognito access token as a bearer — registered pool first, then guest pool.
+- Every LangGraph SDK request (HTTP and SSE) goes through [`authFetch`](src/lib/auth-fetch.ts), which attaches the current Cognito access token as a bearer — the registered session first, then the guest token store.
 
 ### Deployment
 

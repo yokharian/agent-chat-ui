@@ -10,7 +10,7 @@ Four providers for app-wide state: Amplify/Cognito auth, LangGraph streaming, th
 
 ```
 src/providers/
-├── Auth.tsx       # AuthProvider + useAuth (Cognito session, signIn/signUp/guest/resetPassword)
+├── Auth.tsx       # AuthProvider + useAuth (Cognito session, signIn/signUp/guest tokens/resetPassword)
 ├── Stream.tsx     # StreamProvider + useStreamContext (LangGraph useStream wrapper)
 ├── Thread.tsx     # ThreadProvider + useThreads (thread list state)
 └── client.ts      # createClient (LangGraph SDK client factory)
@@ -35,5 +35,5 @@ src/providers/
 - `client.ts`: thin factory; `authFetch` injected at call site
 - Only `Auth.tsx` carries `"use client"` — Stream/Thread/client are client-side via import graph
 - `StreamProvider` throws without `NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_ASSISTANT_ID`; `/info` health check toasts on connect failure
-- Guest flow: "Continue as guest" registers into the dedicated guest Cognito user pool (IDs in `amplify_outputs.json` custom payload; helpers in `src/lib/auth-config.ts`); token resolution prefers the registered pool, then the guest pool
+- Guest flow: one user pool for both flows. "Continue as guest" calls the AppSync `createGuest` query (Turnstile in, tokens out — the lambda burns the password, so no later sign-in) and keeps the three tokens in memory + sessionStorage (`src/lib/guest-session.ts`); renewal uses the refresh token, and a dead guest is replaced transparently (Gate re-runs the challenge). Guests cannot convert — the banner links to a fresh signup
 - Composition in `app/page.tsx`: `AuthProvider` → `ThreadProvider` → `StreamProvider` → `ArtifactProvider` → `Thread` (behind `Gate`; `WelcomeDialog` shows first)
