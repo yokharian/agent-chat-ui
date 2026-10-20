@@ -17,14 +17,20 @@ import {
   confirmResetPassword,
   signOut,
   getCurrentUser,
-  updateUserAttributes,
 } from "aws-amplify/auth";
 import { Hub } from "aws-amplify/utils";
 import {
-  configureGuestAuth,
   configureRegisteredAuth,
   guestAuthConfigAvailable,
 } from "@/lib/auth-config";
+import {
+  clearGuestTokens,
+  createGuestSession,
+  currentGuestAccessToken,
+  isGuestAccessToken,
+  onGuestSessionLost,
+  readGuestTokens,
+} from "@/lib/guest-session";
 
 interface CognitoUser {
   username: string;
@@ -71,32 +77,42 @@ type AuthContextValue = {
     error: string | null;
   }>;
   signOut: () => Promise<void>;
-  updateUserAttributes: (
-    attributes: Record<string, string>,
-  ) => Promise<{ error: string | null }>;
+  guestExpired: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/**
- * Random password for guest users. The guest user pool requires at least 8
- * characters with one lowercase letter and one digit.
- */
-function generateGuestPassword(): string {
-  const digits = "23456789";
-  const letters = "abcdefghijkmnpqrstuvwxyz";
-  const random = (charset: string, length: number): string => {
-    const bytes = new Uint32Array(length);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (b) => charset[b % charset.length]).join("");
-  };
-  return `g${random(digits, 1)}${random(letters, 5)}${random(digits + letters, 10)}`;
-}
+const GUEST_USER: CognitoUser = {
+  username: "guest",
+  attributes: { "custom:is_guest": "true" },
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
+  const [guestExpired, setGuestExpired] = useState(false);
+
+  const adoptGuestTokens = useCallback(
+    (accessToken: string, idToken: string) => {
+      setSession({
+        user: GUEST_USER,
+        accessToken,
+        idToken,
+      });
+      setIsGuest(true);
+      setGuestExpired(false);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    return onGuestSessionLost(() => {
+      setSession(null);
+      setIsGuest(false);
+      setGuestExpired(true);
+    });
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -124,50 +140,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
           setIsGuest(false);
         }
+        return;
       } catch {
-        // No registered-pool session — restore a guest-pool session if present.
-        let guestSession: AuthSession | null = null;
-        if (guestAuthConfigAvailable() && configureGuestAuth()) {
-          try {
-            const authSession = await fetchAuthSession();
-            const accessToken = authSession.tokens?.accessToken?.toString();
-            if (accessToken) {
-              const currentUser = await getCurrentUser();
-              guestSession = {
-                user: {
-                  username: currentUser.username,
-                  email: currentUser.signInDetails?.loginId,
-                  attributes: {
-                    ...((currentUser as { attributes?: Record<string, string> })
-                      .attributes ?? {}),
-                    "custom:is_guest": "true",
-                  },
-                },
-                accessToken,
-                idToken: authSession.tokens?.idToken?.toString(),
-              };
-            }
-          } catch {
-            // No guest session either — fall through to signed-out.
-          } finally {
-            configureRegisteredAuth();
-          }
-        }
+        // No registered session.
+      }
+
+      const guestTokens = readGuestTokens();
+      if (!guestTokens) {
         if (mounted) {
-          if (guestSession) {
-            setSession(guestSession);
-            setIsGuest(true);
-          } else {
-            setSession(null);
-            setIsGuest(false);
-          }
+          setSession(null);
+          setIsGuest(false);
         }
-      } finally {
-        if (mounted) setLoading(false);
+        return;
+      }
+
+      const accessToken = await currentGuestAccessToken();
+      if (mounted) {
+        if (accessToken && isGuestAccessToken(accessToken)) {
+          adoptGuestTokens(accessToken, guestTokens.idToken);
+        } else {
+          clearGuestTokens();
+          setSession(null);
+          setIsGuest(false);
+          setGuestExpired(true);
+        }
       }
     };
 
-    loadSession();
+    loadSession().finally(() => {
+      if (mounted) setLoading(false);
+    });
 
     const hubListener = (data: {
       payload: { event: string; data?: unknown };
@@ -188,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [adoptGuestTokens]);
 
   const signInFn = useCallback(
     async (
@@ -324,77 +326,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  /**
+   * Guests are minted by the backend (`createGuest`): the pool password is
+   * burned server-side, so this is the only way in — there is no sign-in
+   * afterwards, and the session lives in the returned tokens alone.
+   */
   const signInAnonymouslyFn = useCallback(
     async (captchaToken?: string): Promise<{ error: string | null }> => {
-      try {
-        if (!guestAuthConfigAvailable() || !configureGuestAuth()) {
-          return {
-            error: "Guest sign-in is unavailable. Please try again later.",
-          };
-        }
-
-        const guestName = `guest_${Date.now()}`;
-        // The guest pool signs in with email usernames; a synthetic address
-        // under the app's domain keeps the required format without a mailbox.
-        const username = `${guestName}@guest.yokharian.dev`;
-        const password = generateGuestPassword();
-        const clientMetadata = captchaToken ? { captchaToken } : undefined;
-        const validationData = captchaToken
-          ? { turnstileToken: captchaToken }
-          : undefined;
-
-        // 1. Register the guest in the guest user pool — the hard requirement.
-        // The backend pre-sign-up trigger reads the Turnstile token from
-        // validationData["turnstileToken"], never from clientMetadata.
-        try {
-          await signUp({
-            username,
-            password,
-            options: {
-              userAttributes: {
-                email: username,
-                "custom:guest": "true",
-              },
-              validationData,
-            },
-          });
-        } catch (error: unknown) {
-          return {
-            error:
-              error instanceof Error ? error.message : "Guest sign in failed",
-          };
-        }
-
-        // 2. Sign the guest in so requests carry a real guest-pool token. The
-        // pool's pre-sign-up trigger auto-confirms signups once the backend
-        // change is deployed; until then fall back to a local guest session.
-        let guestSession: AuthSession = {
-          user: {
-            username: guestName,
-            email: undefined,
-            attributes: { "custom:is_guest": "true" },
-          },
-          accessToken: undefined,
+      if (!guestAuthConfigAvailable()) {
+        return {
+          error: "Guest sign-in is unavailable. Please try again later.",
         };
-        try {
-          await signIn({ username, password, options: { clientMetadata } });
-          const authSession = await fetchAuthSession();
-          const currentUser = await getCurrentUser();
-          guestSession = {
-            user: {
-              username: currentUser.username,
-              email: currentUser.signInDetails?.loginId,
-              attributes: { "custom:is_guest": "true" },
-            },
-            accessToken: authSession.tokens?.accessToken?.toString(),
-            idToken: authSession.tokens?.idToken?.toString(),
-          };
-        } catch (signInError) {
-          console.warn("Guest registered but not signed in:", signInError);
-        }
+      }
+      if (!captchaToken) {
+        return { error: "Complete the captcha to continue as guest." };
+      }
 
-        setSession(guestSession);
-        setIsGuest(true);
+      try {
+        const tokens = await createGuestSession(captchaToken);
+        adoptGuestTokens(tokens.accessToken, tokens.idToken);
         return { error: null };
       } catch (error: unknown) {
         return {
@@ -403,49 +353,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
     },
-    [],
+    [adoptGuestTokens],
   );
 
   const signOutFn = useCallback(async () => {
     try {
-      // Sign out from the pool the active session belongs to.
-      if (isGuest) {
-        configureGuestAuth();
-      } else {
+      if (!isGuest) {
         configureRegisteredAuth();
+        await signOut({ global: true });
       }
-      await signOut({ global: true });
     } catch (error) {
       console.error("Sign out error:", error);
     } finally {
+      clearGuestTokens();
       setSession(null);
       setIsGuest(false);
-      configureRegisteredAuth();
+      setGuestExpired(false);
     }
   }, [isGuest]);
-
-  const updateUserAttributesFn = useCallback(
-    async (
-      attributes: Record<string, string>,
-    ): Promise<{ error: string | null }> => {
-      try {
-        // Update attributes on the pool the active session belongs to
-        // (guests convert their account from the guest banner).
-        if (isGuest) {
-          configureGuestAuth();
-        } else {
-          configureRegisteredAuth();
-        }
-        await updateUserAttributes({ userAttributes: attributes });
-        return { error: null };
-      } catch (error: unknown) {
-        return {
-          error: error instanceof Error ? error.message : "Update failed",
-        };
-      }
-    },
-    [isGuest],
-  );
 
   return (
     <AuthContext.Provider
@@ -461,7 +386,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         confirmResetPassword: confirmResetPasswordFn,
         signInAnonymously: signInAnonymouslyFn,
         signOut: signOutFn,
-        updateUserAttributes: updateUserAttributesFn,
+        guestExpired,
       }}
     >
       {children}

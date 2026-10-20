@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Ghost } from "lucide-react";
 
 import type { ReactNode } from "react";
@@ -11,7 +11,8 @@ import { useAuth } from "@/providers/Auth";
 import { useTurnstileToken } from "@/components/turnstile-widget";
 
 export function Gate({ children }: { children: ReactNode }) {
-  const { session, loading, isGuest, signInAnonymously } = useAuth();
+  const { session, loading, isGuest, guestExpired, signInAnonymously } =
+    useAuth();
   const [guestPending, setGuestPending] = useState(false);
   const [guestError, setGuestError] = useState<string | null>(null);
   const {
@@ -19,6 +20,32 @@ export function Gate({ children }: { children: ReactNode }) {
     reset: resetCaptcha,
     token: captchaToken,
   } = useTurnstileToken("auth");
+
+  const enterAsGuest = useCallback(
+    async (token: string) => {
+      setGuestPending(true);
+      setGuestError(null);
+      const { error } = await signInAnonymously(token);
+      if (error) {
+        setGuestError(error);
+      }
+      resetCaptcha();
+      setGuestPending(false);
+    },
+    [resetCaptcha, signInAnonymously],
+  );
+
+  const autoRestoreStarted = useRef(false);
+  useEffect(() => {
+    if (session) {
+      autoRestoreStarted.current = false;
+      return;
+    }
+    if (guestExpired && captchaToken && !autoRestoreStarted.current) {
+      autoRestoreStarted.current = true;
+      enterAsGuest(captchaToken);
+    }
+  }, [session, guestExpired, captchaToken, enterAsGuest]);
 
   if (loading) {
     return (
@@ -29,16 +56,30 @@ export function Gate({ children }: { children: ReactNode }) {
   }
 
   if (!session) {
-    const handleGuest = async () => {
-      setGuestPending(true);
-      setGuestError(null);
-      const { error } = await signInAnonymously(captchaToken ?? undefined);
-      if (error) {
-        setGuestError(error);
-      }
-      resetCaptcha();
-      setGuestPending(false);
-    };
+    if (guestExpired) {
+      return (
+        <div className="flex min-h-svh w-full flex-col items-center justify-center gap-3 p-6 md:p-10">
+          <p className="text-muted-foreground text-sm">
+            {guestPending
+              ? "Restoring your guest session..."
+              : "Your guest session ended. Starting a new one..."}
+          </p>
+          {captchaElement}
+          {guestError ? (
+            <p className="text-destructive text-sm">{guestError}</p>
+          ) : null}
+          <Button
+            disabled={guestPending || !captchaToken}
+            onClick={() => captchaToken && enterAsGuest(captchaToken)}
+            type="button"
+            variant="outline"
+          >
+            <Ghost className="size-4" />
+            Continue as guest
+          </Button>
+        </div>
+      );
+    }
 
     return (
       <div className="flex min-h-svh w-full flex-col items-center justify-center p-6 md:p-10">
@@ -51,8 +92,8 @@ export function Gate({ children }: { children: ReactNode }) {
           <div className="mt-3 flex flex-col items-center gap-1">
             <Button
               className="w-full"
-              disabled={guestPending}
-              onClick={handleGuest}
+              disabled={guestPending || !captchaToken}
+              onClick={() => captchaToken && enterAsGuest(captchaToken)}
               type="button"
               variant="outline"
             >

@@ -1,9 +1,9 @@
 import { fetchAuthSession } from "aws-amplify/auth";
 import {
-  configureGuestAuth,
   configureRegisteredAuth,
   guestAuthConfigAvailable,
 } from "./auth-config";
+import { currentGuestAccessToken } from "./guest-session";
 
 /**
  * `fetch` wrapper that injects the current Cognito access token as an
@@ -12,9 +12,10 @@ import {
  * Pass it to the LangGraph SDK via `callerOptions.fetch` (HTTP client)
  * and `fetch` (SSE/WS transport) so all traffic is authenticated.
  *
- * The token is resolved from the registered user pool first, then from the
- * guest user pool; sessions without any Cognito token pass through
- * unauthenticated and the backend decides.
+ * The token is resolved from the registered session first, then from the
+ * guest token store (renewed with its refresh token when close to expiry);
+ * sessions without any token pass through unauthenticated and the backend
+ * decides.
  */
 export const authFetch = async (
   input: RequestInfo | URL,
@@ -36,21 +37,17 @@ export const authFetch = async (
 };
 
 const currentAccessToken = async (): Promise<string | undefined> => {
-  try {
-    configureRegisteredAuth();
-    let token = await sessionToken();
-    if (token) return token;
+  configureRegisteredAuth();
 
-    if (guestAuthConfigAvailable() && configureGuestAuth()) {
-      token = await sessionToken();
-      if (token) return token;
-    }
-    return undefined;
-  } finally {
-    // Leave Amplify pointed at the registered pool; every auth operation
-    // configures the pool it targets explicitly before running.
-    configureRegisteredAuth();
+  const registered = await sessionToken();
+  if (registered) return registered;
+
+  if (guestAuthConfigAvailable()) {
+    const guest = await currentGuestAccessToken();
+    if (guest) return guest;
   }
+
+  return undefined;
 };
 
 const sessionToken = async (): Promise<string | undefined> => {
@@ -58,7 +55,6 @@ const sessionToken = async (): Promise<string | undefined> => {
     const session = await fetchAuthSession();
     return session.tokens?.accessToken?.toString();
   } catch {
-    // No session in the currently configured pool.
     return undefined;
   }
 };

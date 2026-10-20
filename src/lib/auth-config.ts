@@ -1,57 +1,45 @@
 import { Amplify } from "aws-amplify";
 import outputs from "../../amplify_outputs.json";
 
-interface PoolMetadata {
-	appClientIds: {
-		default?: string;
-		vehicleSalesAgent?: string;
-		guest?: string;
-	};
-	userPoolIds: { registered?: string; guest?: string };
-	identityPoolIds: { registered?: string; guest?: string };
-}
-
 /**
- * The backend (the `backend/` Amplify app inside the api.yokharian.dev
- * monorepo) exports its Cognito topology in the `custom` section of
- * `amplify_outputs.json`: `appClientIds`, `userPoolIds`
- * and `identityPoolIds` for the `registered` (authenticated) and `guest`
- * user pools.
- *
- * aws-amplify v6 has a single active Auth config, so every auth operation
- * configures the pool it targets before running via these helpers.
+ * Contract of the backend's `amplify_outputs.json` custom payload: one user
+ * pool and one identity pool for both flows, with `guest` naming the client
+ * the create-guest lambda mints guest tokens from.
  */
-export function getPoolMetadata(): PoolMetadata | null {
-	const payload = (outputs as { custom?: { payload?: string } }).custom
-		?.payload;
-	if (!payload) return null;
-	try {
-		return JSON.parse(payload) as PoolMetadata;
-	} catch {
-		return null;
-	}
+export interface AppAuthConfig {
+  userPoolId?: string;
+  identityPoolId?: string;
+  appClientIds: {
+    default?: string;
+    vehicleSalesAgent?: string;
+    guest?: string;
+  };
 }
 
-export function configureRegisteredAuth(): void {
-	Amplify.configure(outputs);
+export function getAppAuthConfig(): AppAuthConfig | null {
+  const payload = (outputs as { custom?: { payload?: string } }).custom
+    ?.payload;
+  if (!payload) return null;
+  try {
+    const parsed = JSON.parse(payload) as Partial<AppAuthConfig>;
+    return {
+      userPoolId: parsed.userPoolId,
+      identityPoolId: parsed.identityPoolId,
+      appClientIds: parsed.appClientIds ?? {},
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function guestAppClientId(): string | undefined {
+  return getAppAuthConfig()?.appClientIds.guest;
 }
 
 export function guestAuthConfigAvailable(): boolean {
-	const meta = getPoolMetadata();
-	return Boolean(meta?.appClientIds?.guest && meta?.userPoolIds?.guest);
+  return Boolean(guestAppClientId());
 }
 
-/** Configures Amplify for the guest user pool; false when unconfigured. */
-export function configureGuestAuth(): boolean {
-	const meta = getPoolMetadata();
-	if (!meta?.appClientIds?.guest || !meta?.userPoolIds?.guest) return false;
-	Amplify.configure({
-		Auth: {
-			Cognito: {
-				userPoolId: meta.userPoolIds.guest,
-				userPoolClientId: meta.appClientIds.guest,
-			},
-		},
-	});
-	return true;
+export function configureRegisteredAuth(): void {
+  Amplify.configure(outputs);
 }
