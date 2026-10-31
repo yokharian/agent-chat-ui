@@ -1,5 +1,9 @@
 import { generateClient } from "aws-amplify/data";
-import { getAppAuthConfig, guestAppClientId } from "./auth-config";
+import {
+  configureGuestDataAuth,
+  configureRegisteredAuth,
+  getAppAuthConfig,
+} from "./auth-config";
 
 const STORAGE_KEY = "vsa.guest.tokens";
 const EXPIRY_SKEW_MS = 60_000;
@@ -117,12 +121,17 @@ export function clearGuestTokens(): void {
   }
 }
 
-/** Access token of the guest client, which is how guests are told apart. */
+const GUEST_GROUP = "guest";
+
+/**
+ * Guest marker: the create-guest lambda adds the user to the `guest` group
+ * before minting tokens, so `cognito:groups` carries the flag regardless of
+ * which app client issued the token.
+ */
 export function isGuestAccessToken(accessToken: string): boolean {
-  const guestClientId = guestAppClientId();
-  if (!guestClientId) return false;
   const claims = decodeJwtPayload(accessToken);
-  return claims?.client_id === guestClientId;
+  const groups = claims?.["cognito:groups"];
+  return Array.isArray(groups) && groups.includes(GUEST_GROUP);
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -142,24 +151,32 @@ export async function createGuestSession(
   turnstileToken: string,
   email?: string,
 ): Promise<GuestTokens> {
-  const client = generateClient();
-  const queries = client.queries as unknown as {
-    createGuest: (args: {
-      turnstileToken: string;
-      email?: string;
-    }) => Promise<{ data?: unknown; errors?: unknown[] }>;
-  };
+  // The query runs before the caller holds a token, so it must execute
+  // against the guest identity pool's unauthenticated role. Restore the
+  // registered pool afterwards so credential resolution keeps working.
+  configureGuestDataAuth();
+  try {
+    const client = generateClient();
+    const queries = client.queries as unknown as {
+      createGuest: (args: {
+        turnstileToken: string;
+        email?: string;
+      }) => Promise<{ data?: unknown; errors?: unknown[] }>;
+    };
 
-  const { data, errors } = await queries.createGuest({
-    turnstileToken,
-    ...(email ? { email } : {}),
-  });
+    const { data, errors } = await queries.createGuest({
+      turnstileToken,
+      ...(email ? { email } : {}),
+    });
 
-  if (errors?.length) {
-    const first = errors[0] as { message?: string };
-    throw new Error(first?.message ?? "createGuest failed");
+    if (errors?.length) {
+      const first = errors[0] as { message?: string };
+      throw new Error(first?.message ?? "createGuest failed");
+    }
+    return saveGuestTokens(parseResponseBody(data));
+  } finally {
+    configureRegisteredAuth();
   }
-  return saveGuestTokens(parseResponseBody(data));
 }
 
 async function refreshGuestTokens(
